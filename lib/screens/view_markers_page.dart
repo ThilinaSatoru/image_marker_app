@@ -11,6 +11,7 @@ class ViewMarkersPage extends StatefulWidget {
 class _ViewMarkersPageState extends State<ViewMarkersPage> {
   final DatabaseHelper _databaseHelper = DatabaseHelper();
   late Future<List<Map<String, dynamic>>> _items;
+  int? _selectedItemId;
 
   @override
   void initState() {
@@ -18,11 +19,37 @@ class _ViewMarkersPageState extends State<ViewMarkersPage> {
     _items = _databaseHelper.getItems();
   }
 
+  void _deleteItem() async {
+    if (_selectedItemId != null) {
+      try {
+        await _databaseHelper.deleteItem(_selectedItemId!);
+        setState(() {
+          _items = _databaseHelper.getItems();
+          _selectedItemId = null; // Reset selected item
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Item deleted')),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error deleting item: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('Saved Items'),
+        actions: [
+          if (_selectedItemId != null)
+            IconButton(
+              icon: Icon(Icons.delete),
+              onPressed: _deleteItem,
+            ),
+        ],
       ),
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _items,
@@ -46,6 +73,11 @@ class _ViewMarkersPageState extends State<ViewMarkersPage> {
                   item['imagePath'] as String? ?? 'Default Image Path';
 
               return GestureDetector(
+                onLongPress: () {
+                  setState(() {
+                    _selectedItemId = id; // Set the selected item ID
+                  });
+                },
                 onTap: () {
                   Navigator.push(
                     context,

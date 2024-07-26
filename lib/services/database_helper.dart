@@ -178,4 +178,22 @@ class DatabaseHelper {
       whereArgs: [itemId],
     );
   }
+
+  Future<void> deleteItem(int id) async {
+    final db = await database;
+
+    // Delete the item
+    await db.delete(
+      'items',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    // Delete the associated markers
+    await db.delete(
+      'item_markers',
+      where: 'itemId = ?',
+      whereArgs: [id],
+    );
+  }
 }
