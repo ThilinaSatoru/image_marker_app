@@ -50,7 +50,6 @@ class _MarkerDetailsPageState extends State<MarkerDetailsPage> {
     }
   }
 
-
   Future<void> _pickImage() async {
     final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
 
@@ -81,19 +80,98 @@ class _MarkerDetailsPageState extends State<MarkerDetailsPage> {
         }
 
         if (!isMarkerRemoved) {
-          updatedMarkers.add({
-            'x': tapPosition.dx,
-            'y': tapPosition.dy,
-            'name': 'New Marker',
-            'icon': 'location_on',
-            'color': 'red',
-          });
+          _showMarkerDialog(tapPosition);
+        } else {
+          _markerDetails = updatedMarkers;
         }
-
-        _markerDetails = updatedMarkers;
       });
     }
   }
+
+  Future<void> _showMarkerDialog(Offset tapPosition) async {
+    String? markerName;
+    String markerIcon = 'location_on';
+    String markerColor = 'red';
+
+    await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          child: StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) {
+              return SingleChildScrollView(
+                padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(context).viewInsets.bottom),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        decoration: InputDecoration(labelText: 'Marker Name'),
+                        onChanged: (value) {
+                          markerName = value;
+                        },
+                      ),
+                      DropdownButton<String>(
+                        value: markerIcon,
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            markerIcon = newValue!;
+                          });
+                        },
+                        items: <String>['location_on', 'place', 'star', 'flag']
+                            .map<DropdownMenuItem<String>>((String value) {
+                          return DropdownMenuItem<String>(
+                            value: value,
+                            child: Text(value),
+                          );
+                        }).toList(),
+                      ),
+                      DropdownButton<String>(
+                        value: markerColor,
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            markerColor = newValue!;
+                          });
+                        },
+                        items: <String>['red', 'blue', 'green', 'yellow']
+                            .map<DropdownMenuItem<String>>((String value) {
+                          return DropdownMenuItem<String>(
+                            value: value,
+                            child: Text(value),
+                          );
+                        }).toList(),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _markerDetails.add({
+                              'x': tapPosition.dx,
+                              'y': tapPosition.dy,
+                              'name': markerName ?? 'New Marker',
+                              'icon': markerIcon,
+                              'color': markerColor,
+                            });
+                          });
+                          Navigator.of(context).pop(); // Close the dialog
+                        },
+                        child: Text('Add Marker'),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    ).then((_) {
+      // Refresh the widget tree after the dialog closes
+      setState(() {});
+    });
+  }
+
 
   Future<void> _saveChanges() async {
     if (_imageFile == null) {
@@ -181,13 +259,45 @@ class _MarkerDetailsPageState extends State<MarkerDetailsPage> {
               ),
             ),
             for (var marker in _markerDetails)
-              Positioned(
-                left: marker['x'],
-                top: marker['y'],
-                child: Icon(
-                  Icons.location_on,
-                  color: Colors.red,
-                ),
+              Stack(
+                children: [
+                  Positioned(
+                    left: marker['x'],
+                    top: marker['y'],
+                    child: Icon(
+                      marker['icon'] == 'place'
+                          ? Icons.place
+                          : marker['icon'] == 'star'
+                              ? Icons.star
+                              : marker['icon'] == 'flag'
+                                  ? Icons.flag
+                                  : Icons.location_on,
+                      color: marker['color'] == 'red'
+                          ? Colors.red
+                          : marker['color'] == 'blue'
+                              ? Colors.blue
+                              : marker['color'] == 'green'
+                                  ? Colors.green
+                                  : marker['color'] == 'yellow'
+                                      ? Colors.yellow
+                                      : Colors.red,
+                      size: 24, // Adjust the size of the icon as needed
+                    ),
+                  ),
+                  Positioned(
+                    left: marker['x'] - 10, // Adjust as needed
+                    top: marker['y'] - 20, // Adjust as needed
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 4.0),
+                      color: Colors.white,
+                      child: Text(
+                        marker['name'] ?? 'Unnamed',
+                        style: TextStyle(fontSize: 12, color: Colors.black),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ],
               ),
           ],
         ),

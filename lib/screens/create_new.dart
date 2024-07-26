@@ -113,8 +113,6 @@ class _CreateNewState extends State<CreateNew> {
                               'icon': markerIcon,
                               'color': markerColor,
                             });
-                            print(
-                                'Added marker: $_markerDetails'); // Debug line
                           });
                           Navigator.of(context).pop();
                         },
@@ -128,9 +126,11 @@ class _CreateNewState extends State<CreateNew> {
           ),
         );
       },
-    );
+    ).then((_) {
+      // Ensure the UI updates after closing the dialog
+      setState(() {});
+    });
   }
-
 
   void _saveMarkers() async {
     if (_imageFile == null) {
@@ -148,8 +148,6 @@ class _CreateNewState extends State<CreateNew> {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text('Markers saved!')));
   }
-
-  
 
   @override
   Widget build(BuildContext context) {
@@ -180,23 +178,40 @@ class _CreateNewState extends State<CreateNew> {
               return Positioned(
                 left: marker['x'],
                 top: marker['y'],
-                child: Icon(
-                  marker['icon'] == 'place'
-                      ? Icons.place
-                      : marker['icon'] == 'star'
-                          ? Icons.star
-                          : marker['icon'] == 'flag'
-                              ? Icons.flag
-                              : Icons.location_on,
-                  color: marker['color'] == 'red'
-                      ? Colors.red
-                      : marker['color'] == 'blue'
-                          ? Colors.blue
-                          : marker['color'] == 'green'
-                              ? Colors.green
-                              : marker['color'] == 'yellow'
-                                  ? Colors.yellow
-                                  : Colors.red,
+                child: Stack(
+                  children: [
+                    Icon(
+                      marker['icon'] == 'place'
+                          ? Icons.place
+                          : marker['icon'] == 'star'
+                              ? Icons.star
+                              : marker['icon'] == 'flag'
+                                  ? Icons.flag
+                                  : Icons.location_on,
+                      color: marker['color'] == 'red'
+                          ? Colors.red
+                          : marker['color'] == 'blue'
+                              ? Colors.blue
+                              : marker['color'] == 'green'
+                                  ? Colors.green
+                                  : marker['color'] == 'yellow'
+                                      ? Colors.yellow
+                                      : Colors.red,
+                    ),
+                    Positioned(
+                      left: -20, // Adjust as needed
+                      top: -30, // Adjust as needed
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: 4.0),
+                        color: Colors.white,
+                        child: Text(
+                          marker['name'] ?? 'Unnamed',
+                          style: TextStyle(fontSize: 12, color: Colors.black),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               );
             }).toList(),
@@ -209,5 +224,4 @@ class _CreateNewState extends State<CreateNew> {
       ),
     );
   }
-
 }
