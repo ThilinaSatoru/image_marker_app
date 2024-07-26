@@ -1,5 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -33,9 +35,26 @@ class DatabaseHelper {
 
   Future<int> insertItem(String imagePath) async {
     final db = await database;
+
+    // Copy the image to the application's documents directory
+    final directory = await getApplicationDocumentsDirectory();
+    final newImagePath =
+        '${directory.path}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+    final imageFile = File(imagePath);
+    final newImageFile = File(newImagePath);
+
+    // Check if the image file exists before copying
+    if (await imageFile.exists()) {
+      await imageFile.copy(newImagePath);
+    } else {
+      throw Exception('Image file does not exist at $imagePath');
+    }
+
+    // Insert the new image path into the database
     return await db.insert(
       'items',
-      {'imagePath': imagePath},
+      {'imagePath': newImagePath},
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
@@ -105,6 +124,15 @@ class DatabaseHelper {
       );
     }
   }
+
+  Future<void> clearDatabase() async {
+    final db = await database;
+
+    // Drop all tables
+    await db.execute('DROP TABLE IF EXISTS items');
+    await db.execute('DROP TABLE IF EXISTS item_markers');
+  }
+
 
   Future<List<Map<String, dynamic>>> getItems() async {
     final db = await database;
