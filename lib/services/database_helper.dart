@@ -42,7 +42,6 @@ class DatabaseHelper {
         '${directory.path}/${DateTime.now().millisecondsSinceEpoch}.jpg';
 
     final imageFile = File(imagePath);
-    final newImageFile = File(newImagePath);
 
     // Check if the image file exists before copying
     if (await imageFile.exists()) {
