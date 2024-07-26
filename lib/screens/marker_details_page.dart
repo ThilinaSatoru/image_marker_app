@@ -26,23 +26,30 @@ class _MarkerDetailsPageState extends State<MarkerDetailsPage> {
   }
 
   Future<void> _initializeData() async {
-    final item = await _databaseHelper.getItem(widget.itemId);
-    if (item != null) {
-      setState(() {
-        _imageFile = File(item['imagePath']);
-      });
+    try {
+      final item = await _databaseHelper.getItem(widget.itemId);
+      if (item != null) {
+        setState(() {
+          _imageFile = File(item['imagePath']);
+        });
 
-      final markers = await _databaseHelper.getMarkersForItem(widget.itemId);
-      setState(() {
-        _markerDetails = List<Map<String, dynamic>>.from(markers);
-      });
-    } else {
-      setState(() {
-        _imageFile = null;
-        _markerDetails = [];
-      });
+        final markers = await _databaseHelper.getMarkersForItem(widget.itemId);
+        setState(() {
+          _markerDetails = List<Map<String, dynamic>>.from(markers);
+        });
+      } else {
+        setState(() {
+          _imageFile = null;
+          _markerDetails = [];
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading data: $e')),
+      );
     }
   }
+
 
   Future<void> _pickImage() async {
     final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
@@ -90,22 +97,30 @@ class _MarkerDetailsPageState extends State<MarkerDetailsPage> {
 
   Future<void> _saveChanges() async {
     if (_imageFile == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('No image selected')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No image selected')),
+      );
       return;
     }
 
-    await _databaseHelper.updateMarker(
-      widget.itemId,
-      _imageFile!.path,
-      _markerDetails,
-    );
+    try {
+      await _databaseHelper.updateMarker(
+        widget.itemId,
+        _imageFile!.path,
+        _markerDetails,
+      );
 
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('Changes saved!')));
-    setState(() {
-      _isEditing = false;
-    });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Changes saved!')),
+      );
+      setState(() {
+        _isEditing = false;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error saving changes: $e')),
+      );
+    }
   }
 
   @override

@@ -23,7 +23,7 @@ class DatabaseHelper {
       dbPath,
       onCreate: (db, version) async {
         await db.execute(
-          "CREATE TABLE items(id INTEGER PRIMARY KEY AUTOINCREMENT, imagePath TEXT)",
+          "CREATE TABLE items(id INTEGER PRIMARY KEY AUTOINCREMENT, imagePath TEXT, name TEXT)",
         );
         await db.execute(
           "CREATE TABLE item_markers(id INTEGER PRIMARY KEY AUTOINCREMENT, itemId INTEGER, x REAL, y REAL, name TEXT, icon TEXT, color TEXT, FOREIGN KEY(itemId) REFERENCES items(id))",
@@ -131,12 +131,26 @@ class DatabaseHelper {
     // Drop all tables
     await db.execute('DROP TABLE IF EXISTS items');
     await db.execute('DROP TABLE IF EXISTS item_markers');
-  }
 
+    // Recreate tables
+    await db.execute(
+      "CREATE TABLE items(id INTEGER PRIMARY KEY AUTOINCREMENT, imagePath TEXT, name TEXT)",
+    );
+    await db.execute(
+      "CREATE TABLE item_markers(id INTEGER PRIMARY KEY AUTOINCREMENT, itemId INTEGER, x REAL, y REAL, name TEXT, icon TEXT, color TEXT, FOREIGN KEY(itemId) REFERENCES items(id))",
+    );
+  }
 
   Future<List<Map<String, dynamic>>> getItems() async {
     final db = await database;
-    return await db.query('items');
+
+    try {
+      return await db.query('items');
+    } catch (e) {
+      // Log the error and return an empty list or handle it as needed
+      print('Error retrieving items: $e');
+      return [];
+    }
   }
 
   Future<Map<String, dynamic>?> getItem(int id) async {

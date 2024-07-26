@@ -30,7 +30,7 @@ class _ViewMarkersPageState extends State<ViewMarkersPage> {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return Center(child: Text('Database Error: ${snapshot.error}'));
           } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return Center(child: Text('No items found.'));
           }
@@ -55,7 +55,7 @@ class _ViewMarkersPageState extends State<ViewMarkersPage> {
                       width: double.infinity,
                       decoration: BoxDecoration(
                         image: DecorationImage(
-                          image: FileImage(File(imagePath)),
+                          image: _getImageProvider(imagePath),
                           fit: BoxFit.cover,
                         ),
                       ),
@@ -85,5 +85,21 @@ class _ViewMarkersPageState extends State<ViewMarkersPage> {
         },
       ),
     );
+  }
+
+  ImageProvider _getImageProvider(String imagePath) {
+    try {
+      final file = File(imagePath);
+      if (file.existsSync()) {
+        return FileImage(file);
+      } else {
+        return AssetImage(
+            'assets/default_image.png'); // Provide a default image
+      }
+    } catch (e) {
+      // Log error and return default image
+      print('Error loading image: $e');
+      return AssetImage('assets/default_image.png'); // Provide a default image
+    }
   }
 }

@@ -20,6 +20,7 @@ class _CreateNewState extends State<CreateNew> {
     if (pickedFile != null) {
       setState(() {
         _imageFile = File(pickedFile.path);
+        _markerDetails = []; // Clear markers when a new image is picked
       });
     }
   }
@@ -42,18 +43,94 @@ class _CreateNewState extends State<CreateNew> {
       }
 
       if (!isMarkerRemoved) {
-        setState(() {
-          _markerDetails.add({
-            'x': tapPosition.dx,
-            'y': tapPosition.dy,
-            'name': 'New Marker',
-            'icon': 'location_on',
-            'color': 'red',
-          });
-        });
+        _showMarkerDialog(tapPosition);
       }
     }
   }
+
+  void _showMarkerDialog(Offset tapPosition) {
+    String? markerName;
+    String markerIcon = 'location_on';
+    String markerColor = 'red';
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          child: StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) {
+              return SingleChildScrollView(
+                padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(context).viewInsets.bottom),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        decoration: InputDecoration(labelText: 'Marker Name'),
+                        onChanged: (value) {
+                          markerName = value;
+                        },
+                      ),
+                      DropdownButton<String>(
+                        value: markerIcon,
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            markerIcon = newValue!;
+                          });
+                        },
+                        items: <String>['location_on', 'place', 'star', 'flag']
+                            .map<DropdownMenuItem<String>>((String value) {
+                          return DropdownMenuItem<String>(
+                            value: value,
+                            child: Text(value),
+                          );
+                        }).toList(),
+                      ),
+                      DropdownButton<String>(
+                        value: markerColor,
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            markerColor = newValue!;
+                          });
+                        },
+                        items: <String>['red', 'blue', 'green', 'yellow']
+                            .map<DropdownMenuItem<String>>((String value) {
+                          return DropdownMenuItem<String>(
+                            value: value,
+                            child: Text(value),
+                          );
+                        }).toList(),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _markerDetails.add({
+                              'x': tapPosition.dx,
+                              'y': tapPosition.dy,
+                              'name': markerName ?? 'New Marker',
+                              'icon': markerIcon,
+                              'color': markerColor,
+                            });
+                            print(
+                                'Added marker: $_markerDetails'); // Debug line
+                          });
+                          Navigator.of(context).pop();
+                        },
+                        child: Text('Add Marker'),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
 
   void _saveMarkers() async {
     if (_imageFile == null) {
@@ -71,6 +148,8 @@ class _CreateNewState extends State<CreateNew> {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text('Markers saved!')));
   }
+
+  
 
   @override
   Widget build(BuildContext context) {
@@ -97,15 +176,30 @@ class _CreateNewState extends State<CreateNew> {
               )
             else
               Center(child: Text('No image selected')),
-            for (var marker in _markerDetails)
-              Positioned(
+            ..._markerDetails.map((marker) {
+              return Positioned(
                 left: marker['x'],
                 top: marker['y'],
                 child: Icon(
-                  Icons.location_on,
-                  color: Colors.red,
+                  marker['icon'] == 'place'
+                      ? Icons.place
+                      : marker['icon'] == 'star'
+                          ? Icons.star
+                          : marker['icon'] == 'flag'
+                              ? Icons.flag
+                              : Icons.location_on,
+                  color: marker['color'] == 'red'
+                      ? Colors.red
+                      : marker['color'] == 'blue'
+                          ? Colors.blue
+                          : marker['color'] == 'green'
+                              ? Colors.green
+                              : marker['color'] == 'yellow'
+                                  ? Colors.yellow
+                                  : Colors.red,
                 ),
-              ),
+              );
+            }).toList(),
           ],
         ),
       ),
@@ -115,4 +209,5 @@ class _CreateNewState extends State<CreateNew> {
       ),
     );
   }
+
 }
