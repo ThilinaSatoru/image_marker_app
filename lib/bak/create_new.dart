@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:image/image.dart' as img;
-import 'dart:convert';
 import 'dart:io';
 import '../services/database_helper.dart';
+import 'package:path_provider/path_provider.dart';
 
 class CreateNew extends StatefulWidget {
   @override
@@ -152,75 +150,6 @@ class _CreateNewState extends State<CreateNew> {
         .showSnackBar(SnackBar(content: Text('Markers saved!')));
   }
 
-  Future<String> getDocumentsPath() async {
-    Directory? directory = await getExternalStorageDirectory();
-    if (directory != null) {
-      String path = directory.path.split('/Android/data').first;
-      String documentsPath = '$path/Documents';
-      return documentsPath;
-    }
-    return '';
-  }
-
-  Future<void> _saveAsSvg() async {
-    if (_imageFile == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('No image selected!')));
-      return;
-    }
-
-    final sharedPath = await getDocumentsPath();
-    // final directory = await getApplicationDocumentsDirectory();
-    final path = '${sharedPath}/image_with_markers.svg';
-    print('Svg path: $path');
-
-    // Read the image and convert it to base64
-    final imageBytes = await _imageFile!.readAsBytes();
-    final base64Image = base64Encode(imageBytes);
-
-    final svgContent = StringBuffer();
-    svgContent
-        .writeln('<svg xmlns="http://www.w3.org/2000/svg" version="1.1">');
-    svgContent.writeln(
-        '<image href="data:image/png;base64,$base64Image" width="100%" height="100%"/>');
-
-    for (var marker in _markerDetails) {
-      final x = marker['x'];
-      final y = marker['y'];
-      final name = marker['name'] ?? 'Unnamed';
-      final icon = marker['icon'];
-      final color = marker['color'];
-
-      final iconSvg = _getIconSvg(icon);
-      svgContent.writeln('<g transform="translate($x, $y)">');
-      svgContent.writeln(
-          '<text x="0" y="-10" fill="black" font-size="12">$name</text>');
-      svgContent.writeln('<g fill="$color">$iconSvg</g>');
-      svgContent.writeln('</g>');
-    }
-
-    svgContent.writeln('</svg>');
-
-    final file = File(path);
-    await file.writeAsString(svgContent.toString());
-
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('SVG saved at $path')));
-  }
-
-  String _getIconSvg(String icon) {
-    switch (icon) {
-      case 'place':
-        return '<path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5s2.5 1.12 2.5 2.5S13.38 11.5 12 11.5z"/>';
-      case 'star':
-        return '<path d="M12 17.27L18.18 21 16.54 14.27 22 9.24 15.81 8.63 12 2 8.19 8.63 2 9.24 7.46 14.27 5.82 21z"/>';
-      case 'flag':
-        return '<path d="M14.4 6l.6 2H8v9H6V4h8l-1.6 2H18v2z"/>';
-      default:
-        return '<path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5s2.5 1.12 2.5 2.5S13.38 11.5 12 11.5z"/>';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -230,10 +159,6 @@ class _CreateNewState extends State<CreateNew> {
           IconButton(
             icon: Icon(Icons.save),
             onPressed: _saveMarkers,
-          ),
-          IconButton(
-            icon: Icon(Icons.save_alt),
-            onPressed: _saveAsSvg,
           ),
         ],
       ),
