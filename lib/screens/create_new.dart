@@ -132,6 +132,7 @@ class _CreateNewState extends State<CreateNew> {
                       ),
                       ElevatedButton(
                         onPressed: () {
+                          Navigator.of(context).pop();
                           setState(() {
                             _markerDetails.add({
                               'x': tapPosition.dx /
@@ -143,7 +144,6 @@ class _CreateNewState extends State<CreateNew> {
                               'color': markerColor,
                             });
                           });
-                          Navigator.of(context).pop();
                         },
                         child: Text('Add Marker'),
                       ),
@@ -155,11 +155,9 @@ class _CreateNewState extends State<CreateNew> {
           ),
         );
       },
-    ).then((_) {
-      // Ensure the UI updates after closing the dialog
-      setState(() {});
-    });
+    );
   }
+
 
   void _saveMarkers() async {
     if (_imageFile == null) {
