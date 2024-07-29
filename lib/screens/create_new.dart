@@ -15,6 +15,9 @@ class _CreateNewState extends State<CreateNew> {
   List<Map<String, dynamic>> _markerDetails = [];
   final DatabaseHelper _databaseHelper = DatabaseHelper();
   File? _imageFile;
+  Size? _imageSize;
+  Size? _displaySize;
+  double _imageScale = 1.0; // Scaling factor for the image
 
   Future<void> _pickImage() async {
     final ImagePicker picker = ImagePicker();
@@ -24,19 +27,40 @@ class _CreateNewState extends State<CreateNew> {
       setState(() {
         _imageFile = File(pickedFile.path);
         _markerDetails = []; // Clear markers when a new image is picked
+        _getImageSize(_imageFile!);
+      });
+    }
+  }
+
+  Future<void> _getImageSize(File imageFile) async {
+    final image = img.decodeImage(await imageFile.readAsBytes());
+    if (image != null) {
+      setState(() {
+        _imageSize = Size(image.width.toDouble(), image.height.toDouble());
       });
     }
   }
 
   void _handleTap(TapDownDetails details) {
-    if (_imageFile != null) {
+    if (_imageFile != null && _imageSize != null && _displaySize != null) {
       Offset tapPosition = details.localPosition;
+
+      // Convert widget coordinates to image coordinates
+      final imageWidth = _imageSize!.width * _imageScale;
+      final imageHeight = _imageSize!.height * _imageScale;
+
+      // Calculate scale factor if the image is resized
+      final scaleX = imageWidth / _displaySize!.width;
+      final scaleY = imageHeight / _displaySize!.height;
+
+      Offset imageTapPosition =
+          Offset(tapPosition.dx * scaleX, tapPosition.dy * scaleY);
 
       bool isMarkerRemoved = false;
       for (int i = 0; i < _markerDetails.length; i++) {
         final marker = _markerDetails[i];
         final markerOffset = Offset(marker['x'], marker['y']);
-        if ((markerOffset - tapPosition).distance < 20.0) {
+        if ((markerOffset - imageTapPosition).distance < 20.0) {
           setState(() {
             _markerDetails.removeAt(i);
           });
@@ -46,7 +70,7 @@ class _CreateNewState extends State<CreateNew> {
       }
 
       if (!isMarkerRemoved) {
-        _showMarkerDialog(tapPosition);
+        _showMarkerDialog(imageTapPosition);
       }
     }
   }
@@ -110,8 +134,10 @@ class _CreateNewState extends State<CreateNew> {
                         onPressed: () {
                           setState(() {
                             _markerDetails.add({
-                              'x': tapPosition.dx,
-                              'y': tapPosition.dy,
+                              'x': tapPosition.dx /
+                                  _imageScale, // Adjust for scaling
+                              'y': tapPosition.dy /
+                                  _imageScale, // Adjust for scaling
                               'name': markerName ?? 'New Marker',
                               'icon': markerIcon,
                               'color': markerColor,
@@ -169,56 +195,41 @@ class _CreateNewState extends State<CreateNew> {
       return;
     }
 
-    final sharedPath = await getDocumentsPath();
-    // final directory = await getApplicationDocumentsDirectory();
-    final path = '${sharedPath}/image_with_markers.svg';
-    print('Svg path: $path');
+    final documentsPath = await getDocumentsPath();
+    if (documentsPath.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not get documents path!')));
+      return;
+    }
+    final path = '$documentsPath/image_with_markers.svg';
 
-    // Read the image and convert it to base64
+    // Read the image as base64
     final imageBytes = await _imageFile!.readAsBytes();
     final base64Image = base64Encode(imageBytes);
 
-    final svgContent = StringBuffer();
-    svgContent
-        .writeln('<svg xmlns="http://www.w3.org/2000/svg" version="1.1">');
-    svgContent.writeln(
-        '<image href="data:image/png;base64,$base64Image" width="100%" height="100%"/>');
-
-    for (var marker in _markerDetails) {
-      final x = marker['x'];
-      final y = marker['y'];
-      final name = marker['name'] ?? 'Unnamed';
+    final svgContent = '''
+<svg width="${_imageSize?.width}" height="${_imageSize?.height}" xmlns="http://www.w3.org/2000/svg">
+  <image href="data:image/png;base64,$base64Image" x="0" y="0" width="${_imageSize?.width}" height="${_imageSize?.height}" />
+  ${_markerDetails.map((marker) {
       final icon = marker['icon'];
       final color = marker['color'];
+      final name = marker['name'];
+      final x = marker['x'] * _imageScale; // Apply scaling
+      final y = marker['y'] * _imageScale; // Apply scaling
 
-      final iconSvg = _getIconSvg(icon);
-      svgContent.writeln('<g transform="translate($x, $y)">');
-      svgContent.writeln(
-          '<text x="0" y="-10" fill="black" font-size="12">$name</text>');
-      svgContent.writeln('<g fill="$color">$iconSvg</g>');
-      svgContent.writeln('</g>');
-    }
-
-    svgContent.writeln('</svg>');
+      return '''
+    <circle cx="$x" cy="$y" r="10" fill="$color" />
+    <text x="$x" y="${y - 15}" font-size="10" text-anchor="middle" fill="black">$name</text>
+    ''';
+    }).join()}
+</svg>
+''';
 
     final file = File(path);
-    await file.writeAsString(svgContent.toString());
+    await file.writeAsString(svgContent);
 
     ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('SVG saved at $path')));
-  }
-
-  String _getIconSvg(String icon) {
-    switch (icon) {
-      case 'place':
-        return '<path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5s2.5 1.12 2.5 2.5S13.38 11.5 12 11.5z"/>';
-      case 'star':
-        return '<path d="M12 17.27L18.18 21 16.54 14.27 22 9.24 15.81 8.63 12 2 8.19 8.63 2 9.24 7.46 14.27 5.82 21z"/>';
-      case 'flag':
-        return '<path d="M14.4 6l.6 2H8v9H6V4h8l-1.6 2H18v2z"/>';
-      default:
-        return '<path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5s2.5 1.12 2.5 2.5S13.38 11.5 12 11.5z"/>';
-    }
+        .showSnackBar(SnackBar(content: Text('SVG saved to $path')));
   }
 
   @override
@@ -237,62 +248,76 @@ class _CreateNewState extends State<CreateNew> {
           ),
         ],
       ),
-      body: GestureDetector(
-        onTapDown: _handleTap,
-        child: Stack(
-          children: <Widget>[
-            if (_imageFile != null)
-              Positioned.fill(
-                child: Image.file(
-                  _imageFile!,
-                  fit: BoxFit.cover,
-                ),
-              )
-            else
-              Center(child: Text('No image selected')),
-            ..._markerDetails.map((marker) {
-              return Positioned(
-                left: marker['x'],
-                top: marker['y'],
-                child: Stack(
-                  children: [
-                    Icon(
-                      marker['icon'] == 'place'
-                          ? Icons.place
-                          : marker['icon'] == 'star'
-                              ? Icons.star
-                              : marker['icon'] == 'flag'
-                                  ? Icons.flag
-                                  : Icons.location_on,
-                      color: marker['color'] == 'red'
-                          ? Colors.red
-                          : marker['color'] == 'blue'
-                              ? Colors.blue
-                              : marker['color'] == 'green'
-                                  ? Colors.green
-                                  : marker['color'] == 'yellow'
-                                      ? Colors.yellow
-                                      : Colors.red,
-                    ),
-                    Positioned(
-                      left: -20, // Adjust as needed
-                      top: -30, // Adjust as needed
-                      child: Container(
-                        padding: EdgeInsets.symmetric(horizontal: 4.0),
-                        color: Colors.white,
-                        child: Text(
-                          marker['name'] ?? 'Unnamed',
-                          style: TextStyle(fontSize: 12, color: Colors.black),
-                          textAlign: TextAlign.center,
-                        ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          _displaySize = Size(constraints.maxWidth, constraints.maxHeight);
+
+          return GestureDetector(
+            onTapDown: _handleTap,
+            child: Stack(
+              children: <Widget>[
+                if (_imageFile != null)
+                  Positioned.fill(
+                    child: FittedBox(
+                      fit: BoxFit.fitWidth,
+                      child: Image.file(
+                        _imageFile!,
+                        width: _displaySize?.width,
+                        height: _displaySize?.height,
                       ),
                     ),
-                  ],
-                ),
-              );
-            }).toList(),
-          ],
-        ),
+                  )
+                else
+                  Center(child: Text('No image selected')),
+                ..._markerDetails.map((marker) {
+                  final scaledX = marker['x'] * _imageScale;
+                  final scaledY = marker['y'] * _imageScale;
+
+                  return Positioned(
+                    left: scaledX,
+                    top: scaledY,
+                    child: Stack(
+                      children: [
+                        Icon(
+                          marker['icon'] == 'place'
+                              ? Icons.place
+                              : marker['icon'] == 'star'
+                                  ? Icons.star
+                                  : marker['icon'] == 'flag'
+                                      ? Icons.flag
+                                      : Icons.location_on,
+                          color: marker['color'] == 'red'
+                              ? Colors.red
+                              : marker['color'] == 'blue'
+                                  ? Colors.blue
+                                  : marker['color'] == 'green'
+                                      ? Colors.green
+                                      : marker['color'] == 'yellow'
+                                          ? Colors.yellow
+                                          : Colors.red,
+                        ),
+                        Positioned(
+                          left: -20, // Adjust as needed
+                          top: -30, // Adjust as needed
+                          child: Container(
+                            padding: EdgeInsets.symmetric(horizontal: 4.0),
+                            color: Colors.white,
+                            child: Text(
+                              marker['name'] ?? 'Unnamed',
+                              style:
+                                  TextStyle(fontSize: 12, color: Colors.black),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ],
+            ),
+          );
+        },
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _pickImage,
