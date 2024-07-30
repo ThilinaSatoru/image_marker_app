@@ -19,7 +19,7 @@ class MainPage extends StatelessWidget {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => CreateNew()),
+                  MaterialPageRoute(builder: (context) => ImageMarkerPage()),
                 );
               },
               child: Text('Tap Position Example'),
