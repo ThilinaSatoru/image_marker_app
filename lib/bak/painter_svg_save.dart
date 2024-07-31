@@ -179,26 +179,27 @@ class _ImageMarkerPageState extends State<ImageMarkerPage> {
   }
 
   Future<String> _generateSvg() async {
+    final RenderRepaintBoundary boundary =
+        imageKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+    final ui.Image renderedImage = await boundary.toImage(pixelRatio: 3.0);
+    final ByteData? byteData =
+        await renderedImage.toByteData(format: ui.ImageByteFormat.png);
+    final String base64Image = base64Encode(byteData!.buffer.asUint8List());
+
     final double width = MediaQuery.of(context).size.width;
     final double height = width * image!.height / image!.width;
 
-    // Convert the original image to base64
-    final ByteData? originalImageData =
-        await image!.toByteData(format: ui.ImageByteFormat.png);
-    final String base64OriginalImage =
-        base64Encode(originalImageData!.buffer.asUint8List());
-
     String svgString = '''
-  <svg width="$width" height="$height" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-    <image xlink:href="data:image/png;base64,$base64OriginalImage" width="$width" height="$height" />
-  ''';
+    <svg width="$width" height="$height" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+      <image xlink:href="data:image/png;base64,$base64Image" width="$width" height="$height" />
+    ''';
 
     for (final marker in markers) {
       final double cx = marker.offset.dx;
       final double cy = marker.offset.dy;
       svgString += '''
-    <circle cx="$cx" cy="$cy" r="15" fill="red" />
-    ''';
+      <circle cx="$cx" cy="$cy" r="15" fill="red" />
+      ''';
     }
 
     svgString += '</svg>';
@@ -236,8 +237,16 @@ class _ImageMarkerPageState extends State<ImageMarkerPage> {
 
     // Parse markers
     markers.clear();
-    final circleElements = document.findAllElements('circle');
+    final circleElements = document.findAllElements('circle').toList();
 
+    // Remove all circle elements from the SVG
+    final svgElement = document.rootElement;
+    circleElements.forEach((circle) => svgElement.children.remove(circle));
+
+    // Update the SVG content without circle tags
+    final updatedSvgContent = document.toXmlString(pretty: true);
+
+    // Create Marker objects
     for (final circle in circleElements) {
       final String id = DateTime.now().millisecondsSinceEpoch.toString();
       final double cx = double.parse(circle.getAttribute('cx')!);

@@ -16,10 +16,9 @@ class ImageMarkerPage extends StatefulWidget {
 
 class _ImageMarkerPageState extends State<ImageMarkerPage> {
   ui.Image? image;
-  List<Marker> markers = [];
+  List<Offset> markers = [];
   GlobalKey imageKey = GlobalKey();
   bool isEditingExistingSvg = false;
-  bool isAddingMarker = false;
 
   @override
   void initState() {
@@ -44,39 +43,14 @@ class _ImageMarkerPageState extends State<ImageMarkerPage> {
                 onTapUp: _handleTap,
                 child: RepaintBoundary(
                   key: imageKey,
-                  child: Stack(
-                    children: [
-                      CustomPaint(
-                        painter: ImagePainter(image!),
-                        size: Size(
-                          MediaQuery.of(context).size.width,
-                          MediaQuery.of(context).size.width *
-                              image!.height /
-                              image!.width,
-                        ),
-                      ),
-                      ...markers.map((marker) => Positioned(
-                            left: marker.offset.dx,
-                            top: marker.offset.dy,
-                            child: GestureDetector(
-                              onPanUpdate: (details) =>
-                                  _updateMarkerPosition(marker, details),
-                              child: Container(
-                                width: 30,
-                                height: 30,
-                                decoration: BoxDecoration(
-                                  color: Colors.red,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: IconButton(
-                                  icon: Icon(Icons.close,
-                                      size: 15, color: Colors.white),
-                                  onPressed: () => _removeMarker(marker),
-                                ),
-                              ),
-                            ),
-                          )),
-                    ],
+                  child: CustomPaint(
+                    painter: ImageMarkerPainter(image!, markers),
+                    size: Size(
+                      MediaQuery.of(context).size.width,
+                      MediaQuery.of(context).size.width *
+                          image!.height /
+                          image!.width,
+                    ),
                   ),
                 ),
               ),
@@ -84,12 +58,6 @@ class _ImageMarkerPageState extends State<ImageMarkerPage> {
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          FloatingActionButton(
-            onPressed: _toggleAddMarker,
-            child: Icon(isAddingMarker ? Icons.close : Icons.add_location),
-            heroTag: 'toggle',
-          ),
-          SizedBox(height: 10),
           FloatingActionButton(
             onPressed: _saveAsSvg,
             child: Icon(Icons.save),
@@ -106,45 +74,19 @@ class _ImageMarkerPageState extends State<ImageMarkerPage> {
     );
   }
 
-  void _toggleAddMarker() {
-    setState(() {
-      isAddingMarker = !isAddingMarker;
-    });
-  }
-
   void _handleTap(TapUpDetails details) {
-    if (!isAddingMarker) return;
-
     final RenderBox renderBox =
         imageKey.currentContext!.findRenderObject() as RenderBox;
     final Offset localPosition =
         renderBox.globalToLocal(details.globalPosition);
+    final Size imageSize = renderBox.size;
+    final double scale = imageSize.width / image!.width;
 
     setState(() {
-      markers.add(Marker(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        offset: localPosition,
+      markers.add(Offset(
+        localPosition.dx / scale,
+        localPosition.dy / scale,
       ));
-    });
-  }
-
-  void _updateMarkerPosition(Marker marker, DragUpdateDetails details) {
-    setState(() {
-      final RenderBox renderBox =
-          imageKey.currentContext!.findRenderObject() as RenderBox;
-      final Size size = renderBox.size;
-      Offset newPosition = marker.offset + details.delta;
-      newPosition = Offset(
-        newPosition.dx.clamp(0, size.width),
-        newPosition.dy.clamp(0, size.height),
-      );
-      marker.offset = newPosition;
-    });
-  }
-
-  void _removeMarker(Marker marker) {
-    setState(() {
-      markers.remove(marker);
     });
   }
 
@@ -179,26 +121,28 @@ class _ImageMarkerPageState extends State<ImageMarkerPage> {
   }
 
   Future<String> _generateSvg() async {
+    final RenderRepaintBoundary boundary =
+        imageKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+    final ui.Image renderedImage = await boundary.toImage(pixelRatio: 3.0);
+    final ByteData? byteData =
+        await renderedImage.toByteData(format: ui.ImageByteFormat.png);
+    final String base64Image = base64Encode(byteData!.buffer.asUint8List());
+
     final double width = MediaQuery.of(context).size.width;
     final double height = width * image!.height / image!.width;
 
-    // Convert the original image to base64
-    final ByteData? originalImageData =
-        await image!.toByteData(format: ui.ImageByteFormat.png);
-    final String base64OriginalImage =
-        base64Encode(originalImageData!.buffer.asUint8List());
-
     String svgString = '''
-  <svg width="$width" height="$height" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-    <image xlink:href="data:image/png;base64,$base64OriginalImage" width="$width" height="$height" />
-  ''';
-
-    for (final marker in markers) {
-      final double cx = marker.offset.dx;
-      final double cy = marker.offset.dy;
-      svgString += '''
-    <circle cx="$cx" cy="$cy" r="15" fill="red" />
+    <svg width="$width" height="$height" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+      <image xlink:href="data:image/png;base64,$base64Image" width="$width" height="$height" />
     ''';
+
+    final double scale = width / image!.width;
+    for (final marker in markers) {
+      final double cx = marker.dx * scale;
+      final double cy = marker.dy * scale;
+      svgString += '''
+      <circle cx="$cx" cy="$cy" r="5" fill="red" />
+      ''';
     }
 
     svgString += '</svg>';
@@ -237,12 +181,14 @@ class _ImageMarkerPageState extends State<ImageMarkerPage> {
     // Parse markers
     markers.clear();
     final circleElements = document.findAllElements('circle');
+    final double width =
+        double.parse(document.rootElement.getAttribute('width')!);
+    final double scale = width / image!.width;
 
     for (final circle in circleElements) {
-      final String id = DateTime.now().millisecondsSinceEpoch.toString();
       final double cx = double.parse(circle.getAttribute('cx')!);
       final double cy = double.parse(circle.getAttribute('cy')!);
-      markers.add(Marker(id: id, offset: Offset(cx, cy)));
+      markers.add(Offset(cx / scale, cy / scale));
     }
 
     setState(() {
@@ -255,10 +201,11 @@ class _ImageMarkerPageState extends State<ImageMarkerPage> {
   }
 }
 
-class ImagePainter extends CustomPainter {
+class ImageMarkerPainter extends CustomPainter {
   final ui.Image image;
+  final List<Offset> markers;
 
-  ImagePainter(this.image);
+  ImageMarkerPainter(this.image, this.markers);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -269,15 +216,21 @@ class ImagePainter extends CustomPainter {
       Rect.fromLTWH(0, 0, size.width, size.height),
       paint,
     );
+
+    final markerPaint = Paint()
+      ..color = Colors.red
+      ..style = PaintingStyle.fill;
+
+    final scale = size.width / image.width;
+    for (final marker in markers) {
+      canvas.drawCircle(
+        Offset(marker.dx * scale, marker.dy * scale),
+        5,
+        markerPaint,
+      );
+    }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class Marker {
-  final String id;
-  Offset offset;
-
-  Marker({required this.id, required this.offset});
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
