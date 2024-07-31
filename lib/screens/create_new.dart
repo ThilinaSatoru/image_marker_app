@@ -21,6 +21,8 @@ class _ImageMarkerPageState extends State<ImageMarkerPage> {
   bool isEditingExistingSvg = false;
   bool isAddingMarker = false;
 
+  static const double svg_marker_radius = 15;
+
   @override
   void initState() {
     super.initState();
@@ -82,7 +84,8 @@ class _ImageMarkerPageState extends State<ImageMarkerPage> {
                                 width: 30,
                                 height: 30,
                                 decoration: BoxDecoration(
-                                  color: Colors.red,
+                                  color:
+                                      const ui.Color.fromARGB(171, 244, 67, 54),
                                   shape: BoxShape.circle,
                                 ),
                                 child: IconButton(
@@ -192,7 +195,7 @@ class _ImageMarkerPageState extends State<ImageMarkerPage> {
     final documentsPath = await _getDocumentsPath();
     if (documentsPath.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not get documents path!')));
+          const SnackBar(content: Text('Could not get documents path!')));
       return;
     }
     final filePath = '$documentsPath/marked_image.svg';
@@ -201,9 +204,32 @@ class _ImageMarkerPageState extends State<ImageMarkerPage> {
     await file.writeAsString(svgString);
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Image saved as SVG')),
+      const SnackBar(content: Text('Image saved as SVG')),
     );
   }
+
+  // SVG Marker offset resolver
+  // Function to calculate additional offsets based on the given image resolution
+  Offset calculateAdditionalOffsets(double imageWidth, double imageHeight) {
+    // Standard image size (480x320)
+    const double standardWidth = 480.0;
+    const double standardHeight = 320.0;
+
+    // Standard offsets
+    const double standardOffsetX = 20.0;
+    const double standardOffsetY = 20.0;
+
+    // Calculate scale factors
+    final double scaleX = imageWidth / standardWidth;
+    final double scaleY = imageHeight / standardHeight;
+
+    // Calculate the additional offsets
+    final double additionalOffsetX = standardOffsetX * scaleX;
+    final double additionalOffsetY = standardOffsetY * scaleY;
+
+    return Offset(additionalOffsetX, additionalOffsetY);
+  }
+
 
   Future<String> _generateSvg() async {
     final double originalWidth = image!.width.toDouble();
@@ -222,9 +248,9 @@ class _ImageMarkerPageState extends State<ImageMarkerPage> {
     final double scaleX = originalWidth / displayedWidth;
     final double scaleY = originalHeight / displayedHeight;
 
-    // Define the offset to be added to the marker positions
-    const double offsetX = 20.0;
-    const double offsetY = 20.0;
+    // Calculate the additional offsets based on the image size
+    final Offset additionalOffsets =
+        calculateAdditionalOffsets(originalWidth, originalHeight);
 
     String svgString = '''
   <svg width="$originalWidth" height="$originalHeight" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
@@ -232,16 +258,12 @@ class _ImageMarkerPageState extends State<ImageMarkerPage> {
   ''';
 
     for (final marker in markers) {
-      final double cx = (marker.offset.dx * scaleX) + offsetX;
-      final double cy = (marker.offset.dy * scaleY) + offsetY;
-      final double scaledRadius = 15 * scaleX; // Scale the radius of the marker
-
-      // Debug logging
-      print('Marker position: (${marker.offset.dx}, ${marker.offset.dy})');
-      print('Scaled position: ($cx, $cy)');
+      final double cx = (marker.offset.dx * scaleX) + additionalOffsets.dx;
+      final double cy = (marker.offset.dy * scaleY) + additionalOffsets.dy;
+      // Fixed radius
 
       svgString += '''
-    <circle cx="$cx" cy="$cy" r="$scaledRadius" fill="red" />
+    <circle cx="$cx" cy="$cy" r="$svg_marker_radius" fill="red" fill-opacity="0.7"/>
     ''';
     }
 
@@ -250,15 +272,11 @@ class _ImageMarkerPageState extends State<ImageMarkerPage> {
   }
 
 
-
-
-
-
   Future<void> _loadSvg() async {
     final documentsPath = await _getDocumentsPath();
     if (documentsPath.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not get documents path!')));
+          const SnackBar(content: Text('Could not get documents path!')));
       return;
     }
     final filePath = '$documentsPath/marked_image.svg';
@@ -269,7 +287,7 @@ class _ImageMarkerPageState extends State<ImageMarkerPage> {
       _parseSvg(svgContent);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No saved SVG file found')),
+        const SnackBar(content: Text('No saved SVG file found')),
       );
     }
   }
@@ -283,23 +301,38 @@ class _ImageMarkerPageState extends State<ImageMarkerPage> {
     final decodedImage = base64Decode(base64Image);
     image = await decodeImageFromList(decodedImage);
 
+    // Calculate the scale factor between the displayed size and the original size
+    final double originalWidth = image!.width.toDouble();
+    final double originalHeight = image!.height.toDouble();
+    final double displayedWidth = MediaQuery.of(context).size.width;
+    final double displayedHeight =
+        displayedWidth * originalHeight / originalWidth;
+    final double scaleX = originalWidth / displayedWidth;
+    final double scaleY = originalHeight / displayedHeight;
+
+    // Calculate the additional offsets based on the image size
+    final Offset additionalOffsets =
+        calculateAdditionalOffsets(originalWidth, originalHeight);
+
     // Parse markers
     markers.clear();
     final circleElements = document.findAllElements('circle');
-    final double width = image!.width.toDouble();
-    final double height = image!.height.toDouble();
-    final Size size = Size(
-      MediaQuery.of(context).size.width,
-      MediaQuery.of(context).size.width * height / width,
-    );
 
     for (final circle in circleElements) {
-      final String id = DateTime.now().millisecondsSinceEpoch.toString();
-      final double cx = double.parse(circle.getAttribute('cx')!);
-      final double cy = double.parse(circle.getAttribute('cy')!);
-      final double x = (cx / width) * size.width;
-      final double y = (cy / height) * size.height;
-      markers.add(Marker(id: id, offset: Offset(x, y)));
+      final double cx =
+          double.parse(circle.getAttribute('cx')!) - additionalOffsets.dx;
+      final double cy =
+          double.parse(circle.getAttribute('cy')!) - additionalOffsets.dy;
+      final double scaledRadius = double.parse(circle.getAttribute('r')!);
+
+      // Adjust marker position based on scale factor
+      final double markerX = cx / scaleX;
+      final double markerY = cy / scaleY;
+
+      markers.add(Marker(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        offset: Offset(markerX, markerY),
+      ));
     }
 
     setState(() {
@@ -310,6 +343,7 @@ class _ImageMarkerPageState extends State<ImageMarkerPage> {
       SnackBar(content: Text('SVG loaded successfully')),
     );
   }
+
 }
 
 class ImagePainter extends CustomPainter {
