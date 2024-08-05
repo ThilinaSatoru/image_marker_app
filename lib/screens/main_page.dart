@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'create_new.dart';
-import 'view_markers_page.dart';
+import 'svg_create_page.dart';
+import 'svg_list_page.dart';
 import '../widgets/custom_app_bar.dart';
-import '../services/database_helper.dart';
+
 
 class MainPage extends StatelessWidget {
-  final DatabaseHelper _databaseHelper = DatabaseHelper();
+  // final DatabaseHelper _databaseHelper = DatabaseHelper();
   
   @override
   Widget build(BuildContext context) {
@@ -19,31 +19,19 @@ class MainPage extends StatelessWidget {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => ImageMarkerPage()),
+                  MaterialPageRoute(builder: (context) => SvgCreatePage()),
                 );
               },
-              child: Text('Tap Position Example'),
+              child: Text('Create Blueprint'),
             ),
             ElevatedButton(
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => ViewMarkersPage()),
+                  MaterialPageRoute(builder: (context) => SvgListPage()),
                 );
               },
-              child: Text('View Saved Markers'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                // Clear the database
-                await _databaseHelper.clearDatabase();
-
-                // Show a confirmation message
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Database cleared')),
-                );
-              },
-              child: Text('Clear Database'),
+              child: Text('View Blueprints'),
             ),
           ],
         ),
